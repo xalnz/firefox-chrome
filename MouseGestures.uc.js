@@ -11,7 +11,10 @@
 // @note         Ctrl+(right-click-up) => Reset Gesture
 //               動作がおかしくなったらCtrl+右クリックで初期化。
 // @note         Fx3.5/Ubuntu9.10 と Fx3.6/WinVistaSP2 で動作確認
+// @note         新たに 'Save Selection to Local', 'Gallery Maker',
+//               'Save Links', 'Classify Links'などを追加。
 //==/UserScript==
+
 var ucjsMouseGestures = {
 // options
 enableWheelGestures: true,
@@ -748,3 +751,4 @@ Album: function(){
 
 ucjsMouseGestures.init();
 
+// vim: ff=unix fenc=utf-8
