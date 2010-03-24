@@ -11,8 +11,7 @@
 // @note         Ctrl+(right-click-up) => Reset Gesture
 //               動作がおかしくなったらCtrl+右クリックで初期化。
 // @note         Fx3.5/Ubuntu9.10 と Fx3.6/WinVistaSP2 で動作確認
-// @note         新たに 'Save Selection to Local', 'Gallery Maker',
-//               'Save Links', 'Classify Links'などを追加。
+// @note         このスクリプトの最後におまけ機能があります。
 //==/UserScript==
 
 var ucjsMouseGestures = {
@@ -65,7 +64,8 @@ GESTURES:{
 
 /*=== Popup ===*/
 	'RD':{name:'[Popup] Search Engines',cmd:function(self,event){self._buildPopup(event,"WebSearchPopup");}},
-	'RU':{name:'[Popup] All Tabs',cmd:function(self,event){self._buildPopup(event,"AllTabsPopup");}},
+	//'RU':{name:'[Popup] All Tabs',cmd:function(self,event){self._buildPopup(event,"AllTabsPopup");}},
+	'RU':{name:'[Popup] Google Suggestions',cmd:function(self,event){self._buildPopup(event,"GoogleSuggestPopup");}},
 	'W+':{name:'[Popup] Closed Tabs',cmd:function(self,event){self._buildPopup(event,"ClosedTabsPopup");}},
 	'W-':{name:'[Popup] Histories',cmd:function(self,event){self._buildPopup(event,"HistoryPopup");}},
 
@@ -225,9 +225,6 @@ GESTURES:{
 		// バックグラウンド処理なので保存完了が分からないのが欠点。
 		// フォルダを開いて全てダウンロード完了したかを確認するしかない。
 		//
-		// 何百と保存する時に、ダウンロードマネージャが
-		// パンクするかもしれないから。
-		//
 		var filter = ".+\\.(png|jpg|gif|bmp|svg|jpeg)$";
 		var minWidth=50, minHeight=50;
 		var skipTextLink = false;
@@ -282,7 +279,7 @@ GESTURES:{
 
 			if (re_video.test(ext)) {
 				x.innerHTML = mktag(x, 'MOV'+(++cm)+'/'+ext);
-				x.style.color = 'brown';
+				x.style.color = 'firebrick';
 			} else if (re_image.test(ext)) {
 				x.innerHTML = mktag(x, 'IMG'+(++ci)+'/'+ext);
 				x.style.color = 'orangered';
@@ -401,6 +398,13 @@ handleEvent:function(event){
 					case"AllTabsPopup":
 						gBrowser.selectedTab=gBrowser.mTabs[activeItem.index];
 						break;
+					case"GoogleSuggestPopup":
+						var suggestion=activeItem.suggestion;
+						document.getElementById('searchbar').textbox.value=suggestion;
+						var url='http://www.google.co.jp/search?hl=ja&ie=utf-8&oe=utf-8&q='
+									+ encodeURIComponent(suggestion);
+						gBrowser.loadOneTab(url,null,null,null,false,false);
+						break;
 				}
 				popup.hidePopup();
 			}
@@ -484,80 +488,149 @@ _buildPopup:function(event,gestureCmd){
 		popup=document.createElement("popup");
 		popup.id=this.POPUP_ID;
 	}
+
 	document.getElementById("mainPopupSet").appendChild(popup);
 	popup.setAttribute("gesturecommand",gestureCmd);
+
 	switch(gestureCmd){
 		case"WebSearchPopup":
-			var searchSvc=Cc["@mozilla.org/browser/search-service;1"].getService(Ci.nsIBrowserSearchService);
+			var searchSvc = Cc["@mozilla.org/browser/search-service;1"].getService(Ci.nsIBrowserSearchService);
 			var engines=searchSvc.getVisibleEngines({});
-			if(engines.length<1)throw"No search engines installed.";
-			for(var i=engines.length-1;i>=0;--i){
+			if (engines.length<1)
+				throw "No search engines installed.";
+			for (var i=engines.length-1; i>=0; --i){
 				var engine = engines[i];
-				var menuitem=document.createElement("menuitem");
+				var menuitem = document.createElement("menuitem");
 				menuitem.setAttribute("label",engine.name);
 				menuitem.setAttribute("class","menuitem-iconic");
-				if(engine.iconURI)menuitem.setAttribute("src",engine.iconURI.spec);
+				if (engine.iconURI) menuitem.setAttribute("src", engine.iconURI.spec);
 				popup.insertBefore(menuitem,popup.firstChild);
-				menuitem.engine=engine;
+				menuitem.engine = engine;
 			}
-			popup.setAttribute("selectedtext",getBrowserSelection().toString());
+			popup.setAttribute("selectedtext", getBrowserSelection().toString());
 			break;
 		case"ClosedTabsPopup":
-			try{
-				if(!gPrefService.getBoolPref("browser.sessionstore.enabled"))throw"Session Restore feature is disabled.";
-			}catch(e){}
-			var ss=Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
-			if(ss.getClosedTabCount(window)==0)throw"No restorable tabs in this window.";
-			var undoItems=eval("("+ss.getClosedTabData(window)+")");
-			for(var i=0,LEN=undoItems.length;i<LEN;i++){
-				var menuitem=popup.appendChild(document.createElement("menuitem"));
-				menuitem.setAttribute("label",undoItems[i].title);
-				menuitem.setAttribute("class","menuitem-iconic bookmark-item");
-				menuitem.index=i;
-				var iconURL=undoItems[i].image;
-				if(iconURL)menuitem.setAttribute("image",iconURL);
+			try {
+				if (!gPrefService.getBoolPref("browser.sessionstore.enabled"))
+					throw "Session Restore feature is disabled.";
+			} catch (e) {}
+			var ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
+			if (ss.getClosedTabCount(window)==0)
+				throw "No restorable tabs in this window.";
+			var undoItems = eval("("+ss.getClosedTabData(window)+")");
+			for(var i=0,itm; item=undoItems[i]; i++){
+				var menuitem = popup.appendChild(document.createElement("menuitem"));
+				menuitem.setAttribute("label", item.title);
+				menuitem.setAttribute("class", "menuitem-iconic bookmark-item");
+				menuitem.index = i;
+				var iconURL = item.image;
+				if (iconURL) menuitem.setAttribute("image", iconURL);
 			}
 			break;
 		case"HistoryPopup":
-			var sessionHistory=gBrowser.webNavigation.sessionHistory;
-			if(sessionHistory.count<1)throw"No back/forward history for this tab.";
-			var curIdx=sessionHistory.index;
-			for(var i=0,shc=sessionHistory.count;i<shc;i++){
-				var entry=sessionHistory.getEntryAtIndex(i,false);
-				if(!entry)continue;
-				var menuitem=document.createElement("menuitem");
-				popup.insertBefore(menuitem,popup.firstChild);
-				menuitem.setAttribute("label",entry.title);
-				try{
-					var iconURL=Cc["@mozilla.org/browser/favicon-service;1"].getService(Ci.nsIFaviconService).getFaviconForPage(entry.URI).spec;
-					menuitem.style.listStyleImage="url("+iconURL+")";
-				}catch(e){}
-				menuitem.index=i;
-				if(i==curIdx){
-					menuitem.style.listStyleImage="";
-					menuitem.setAttribute("type","radio");
-					menuitem.setAttribute("checked","true");
-					menuitem.className="unified-nav-current";
-					activeItem=menuitem;
-				}else{
-					menuitem.className=i<curIdx?"unified-nav-back menuitem-iconic":"unified-nav-forward menuitem-iconic";
+			var sessionHistory = gBrowser.webNavigation.sessionHistory;
+			if (sessionHistory.count<1)
+				throw "No back/forward history for this tab.";
+			var curIdx = sessionHistory.index;
+			for (var i=0,entry; entry=sessionHistory.getEntryAtIndex(i,false); i++){
+				if (!entry) continue;
+				var menuitem = document.createElement("menuitem");
+				popup.insertBefore(menuitem, popup.firstChild);
+				menuitem.setAttribute("label", entry.title);
+				try {
+					var iconURL = Cc["@mozilla.org/browser/favicon-service;1"].getService(Ci.nsIFaviconService).getFaviconForPage(entry.URI).spec;
+					menuitem.style.listStyleImage = "url("+iconURL+")";
+				} catch (e) {}
+				menuitem.index = i;
+				if (i == curIdx){
+					menuitem.style.listStyleImage = "";
+					menuitem.setAttribute("type", "radio");
+					menuitem.setAttribute("checked", "true");
+					menuitem.className = "unified-nav-current";
+					activeItem = menuitem;
+				} else {
+					menuitem.className = i<curIdx ? "unified-nav-back menuitem-iconic" : "unified-nav-forward menuitem-iconic";
 				}
 			}
 			break;
 		case"AllTabsPopup":
-			var tabs=gBrowser.mTabs;
-			if(tabs.length<1)return;
-			for(var i=0,LEN=tabs.length;i<LEN;i++){
-				var menuitem=popup.appendChild(document.createElement("menuitem"));
-				var tab=tabs[i];
-				menuitem.setAttribute("class","menuitem-iconic bookmark-item");
-				menuitem.setAttribute("label",tab.label);
-				menuitem.setAttribute("crop",tab.getAttribute("crop"));
-				menuitem.setAttribute("image",tab.getAttribute("image"));
-				menuitem.index=i;
-				if(tab.selected)activeItem=menuitem;
+			var tabs = gBrowser.mTabs;
+			if (tabs.length<1) return;
+			for(var i=0,tab; tab=tabs[i]; i++){
+				var menuitem = popup.appendChild(document.createElement("menuitem"));
+				menuitem.setAttribute("class", "menuitem-iconic bookmark-item");
+				menuitem.setAttribute("label", tab.label);
+				menuitem.setAttribute("crop", tab.getAttribute("crop"));
+				menuitem.setAttribute("image", tab.getAttribute("image"));
+				menuitem.index = i;
+				if (tab.selected)
+					activeItem = menuitem;
 			}
 			break;
+		case"GoogleSuggestPopup":
+			var seltext = getBrowserSelection().toString();
+			if (!seltext) return;
+			var url = 'http://www.google.co.jp/complete/search?output=toolbar&q='
+							+ encodeURIComponent(seltext); 
+
+			var req = new XMLHttpRequest()
+			req.open('GET', url, true);
+			req.onreadystatechange = function() {
+				if (req.readyState == 4) {
+					if (req.status == 200) {
+						var res = req.responseXML;
+						var tags = res.getElementsByTagName('suggestion');
+						var suggestions = new Array();
+
+						suggestions.push(seltext);
+						for (var i=0,tag; tag=tags[i]; ++i)
+							suggestions.push(tag.getAttribute('data'));
+
+						for (var i=0, sugg; sugg=suggestions[i]; ++i) {
+							var menuitem = document.createElement("menuitem");
+							menuitem.setAttribute("label", sugg);
+							menuitem.suggestion = sugg;
+							popup.appendChild(menuitem);
+						}
+					} else {
+						//alert('Error: MouseGesutures > GoogleSuggestPopup:\n'+ url);
+					}
+				}
+			};
+			req.send(null);
+			break;
+		case"KeyPhrasePopup":
+			var seltext = getBrowserSelection().toString();
+			if (!seltext) return;
+			var url = 'http://jlp.yahooapis.jp/KeyphraseService/V1/extract?appid=<あなたのアプリケーションID>&sentence=<対象のテキスト>'
+							+ encodeURIComponent(seltext); 
+
+			var req = new XMLHttpRequest()
+			req.open('GET', url, true);
+			req.onreadystatechange = function() {
+				if (req.readyState == 4) {
+					if (req.status == 200) {
+						var res = req.responseXML;
+						var tags = res.getElementsByTagName('suggestion');
+						var suggestions = new Array();
+
+						suggestions.push(seltext);
+						for (var i=0,tag; tag=tags[i]; ++i)
+							suggestions.push(tag.getAttribute('data'));
+
+						for (var i=0, sugg; sugg=suggestions[i]; ++i) {
+							var menuitem = document.createElement("menuitem");
+							menuitem.setAttribute("label", sugg);
+							menuitem.suggestion = sugg;
+							popup.appendChild(menuitem);
+						}
+					} else {
+						//alert('Error: MouseGesutures > GoogleSuggestPopup:\n'+ url);
+					}
+				}
+			};
+			req.send(null);
+			
 	}
 	document.popupNode=null;
 	document.tooltipNode=null;
@@ -577,10 +650,10 @@ saveLinkToLocal: function(url, fpath, skipPrompt) {
 		fp.defaultString = fpath;
 		switch (fp.show()) {
 			case (nsIFilePicker.returnOK):
+			case (nsIFilePicker.returnReplace):
 				file = fp.file;
 				break;
 			case (nsIFilePicker.returnCancel):
-			case (nsIFilePicker.returnReplace):
 			default:
 				return null;
 		}
@@ -601,7 +674,7 @@ saveLinkToLocal: function(url, fpath, skipPrompt) {
 	try {
 		//saveURL(url, fpath, null, false, skipPrompt, null);
 		persist.saveURI( uri, null, null, null, "", file);
-	} catch(ex) { alert('failed:\n' + ex); return null; }
+	} catch (ex) { alert('failed:\n' + ex); return null; }
 	return file; // nsILocalFileObject or null
 },
 
@@ -611,15 +684,15 @@ saveTextToLocal: function(text, fpath, skipPrompt) {
 		var nsIFilePicker = Ci.nsIFilePicker;
 		var fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
 		fp.init(document.commandDispatcher.focusedWindow, "Select a File", nsIFilePicker.modeSave);
-		fp.appendFilters(nsIFilePicker.filterAll | nsIFilePicker.filterImages);
-		fp.appendFilters(nsIFilePicker.filterText | nsIFilePicker.filterHTML);
+		fp.appendFilters(nsIFilePicker.filterText | nsIFilePicker.filterImages);
+		fp.appendFilters(nsIFilePicker.filterHTML | nsIFilePicker.filterAll);
 		fp.defaultString = fpath;
 		switch (fp.show()) {
 			case (nsIFilePicker.returnOK):
+			case (nsIFilePicker.returnReplace):
 				file = fp.file;
 				break;
 			case (nsIFilePicker.returnCancel):
-			case (nsIFilePicker.returnReplace):
 			default:
 				return null;
 		}
@@ -637,7 +710,7 @@ saveTextToLocal: function(text, fpath, skipPrompt) {
 		strm.init(file, 0x02 | 0x08 | 0x20, 0664, 0); // write, create, truncate
 		strm.write(text, text.length);
 		strm.flush();
-	} catch(ex) {
+	} catch (ex) {
 		alert('failed:\n' + ex);
 		file = null;
 	}
@@ -751,4 +824,31 @@ Album: function(){
 
 ucjsMouseGestures.init();
 
-// vim: ff=unix fenc=utf-8
+
+
+//==Misc==
+// @homepage     http://d.hatena.ne.jp/Griever
+// @description  おまけ機能
+//==/Misc==
+
+// マウスホイールで「次を検索」「前を検索」
+gFindBar.addEventListener('DOMMouseScroll', function (event){
+	gFindBar.onFindAgainCommand(event.detail < 0);
+}, false);
+
+// タブバーを中クリックで閉じたタブを戻す
+gBrowser.mTabContainer.addEventListener('mousedown', function (event){
+	if (event.target.localName != 'tab' && event.button == 1){
+		document.getElementById('History:UndoCloseTab').doCommand();
+	}
+}, false);
+
+// タブをダブルクリックで更新
+gBrowser.mTabContainer.addEventListener('dblclick', function (event){
+	if (event.target.localName == 'tab' && event.button == 0){
+		getBrowser().getBrowserForTab(event.target).reload();
+	}
+}, false);
+
+
+// vim: fenc=utf-8 ff=unix
