@@ -96,6 +96,8 @@ GESTURES:{
 		var sel = _window.getSelection();
 		if (sel && !sel.isCollapsed) {
 			var fname = _window.location.href.match(/[^\/]+$/) + '.txt';
+			fname = decodeURIComponent(fname);
+			fname = fname.replace(/[\*\:\?\"\|\/\\<>]/g, '_');
 			self.saveTextToLocal(sel.toString(), fname, false);
 		} else {
 			alert('No Selection!');
@@ -241,7 +243,8 @@ GESTURES:{
 		var delay=0, saveDir, url, filename;
 		var re_base = (new RegExp()).compile('([^/]+)$');
 		for (url in album.URLs) {
-			filename = url.match(re_base)[0];
+			filename = decodeURIComponent(url.match(re_base)[0])
+							.replace(/[\*\:\?\"\|\/\\<>]/g, '_');
 			if (delay) {
 				setTimeout('ucjsMouseGestures.saveLinkToLocal("'+ url +'","'+ saveDir + filename +'", true)', delay);
 			} else {
