@@ -599,38 +599,6 @@ _buildPopup:function(event,gestureCmd){
 			};
 			req.send(null);
 			break;
-		case"KeyPhrasePopup":
-			var seltext = getBrowserSelection().toString();
-			if (!seltext) return;
-			var url = 'http://jlp.yahooapis.jp/KeyphraseService/V1/extract?appid=<あなたのアプリケーションID>&sentence=<対象のテキスト>'
-							+ encodeURIComponent(seltext); 
-
-			var req = new XMLHttpRequest()
-			req.open('GET', url, true);
-			req.onreadystatechange = function() {
-				if (req.readyState == 4) {
-					if (req.status == 200) {
-						var res = req.responseXML;
-						var tags = res.getElementsByTagName('suggestion');
-						var suggestions = new Array();
-
-						suggestions.push(seltext);
-						for (var i=0,tag; tag=tags[i]; ++i)
-							suggestions.push(tag.getAttribute('data'));
-
-						for (var i=0, sugg; sugg=suggestions[i]; ++i) {
-							var menuitem = document.createElement("menuitem");
-							menuitem.setAttribute("label", sugg);
-							menuitem.suggestion = sugg;
-							popup.appendChild(menuitem);
-						}
-					} else {
-						//alert('Error: MouseGesutures > GoogleSuggestPopup:\n'+ url);
-					}
-				}
-			};
-			req.send(null);
-			
 	}
 	document.popupNode=null;
 	document.tooltipNode=null;
